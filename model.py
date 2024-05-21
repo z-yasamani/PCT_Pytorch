@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from util import sample_and_group 
+from kan import KAN
 
 class Local_op(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -39,14 +40,16 @@ class Pct(nn.Module):
                                     nn.BatchNorm1d(1024),
                                     nn.LeakyReLU(negative_slope=0.2))
 
-
-        self.linear1 = nn.Linear(1024, 512, bias=False)
+        # replace KAN layer
+        self.kan1 = KAN([1024, 5, 512])
         self.bn6 = nn.BatchNorm1d(512)
         self.dp1 = nn.Dropout(p=args.dropout)
-        self.linear2 = nn.Linear(512, 256)
+        # replace KAN layer
+        self.kan2 = KAN([512, 5, 256])
         self.bn7 = nn.BatchNorm1d(256)
         self.dp2 = nn.Dropout(p=args.dropout)
-        self.linear3 = nn.Linear(256, output_channels)
+        # replace KAN layer
+        self.kan3 = KAN([256, 5, output_channels])
 
     def forward(self, x):
         xyz = x.permute(0, 2, 1)
@@ -66,11 +69,11 @@ class Pct(nn.Module):
         x = torch.cat([x, feature_1], dim=1)
         x = self.conv_fuse(x)
         x = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-        x = F.leaky_relu(self.bn6(self.linear1(x)), negative_slope=0.2)
+        x = F.leaky_relu(self.bn6(self.kan1(x)), negative_slope=0.2)
         x = self.dp1(x)
-        x = F.leaky_relu(self.bn7(self.linear2(x)), negative_slope=0.2)
+        x = F.leaky_relu(self.bn7(self.kan2(x)), negative_slope=0.2)
         x = self.dp2(x)
-        x = self.linear3(x)
+        x = self.kan3(x)
 
         return x
 

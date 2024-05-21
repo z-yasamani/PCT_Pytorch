@@ -27,6 +27,7 @@ def _init_():
     os.system('cp data.py checkpoints' + '/' + args.exp_name + '/' + 'data.py.backup')
 
 def train(args, io):
+    # load data
     train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points), num_workers=8,
                             batch_size=args.batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points), num_workers=8,
@@ -34,6 +35,7 @@ def train(args, io):
 
     device = torch.device("cuda" if args.cuda else "cpu")
 
+    # load model
     model = Pct(args).to(device)
     print(str(model))
     model = nn.DataParallel(model)
