@@ -3,6 +3,7 @@ import glob
 import h5py
 import numpy as np
 from torch.utils.data import Dataset
+import torch
 
 def download():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -76,9 +77,38 @@ class ModelNet40(Dataset):
         return self.data.shape[0]
 
 
-if __name__ == '__main__':
-    train = ModelNet40(1024)
-    test = ModelNet40(1024, 'test')
-    for data, label in train:
-        print(data.shape)
-        print(label.shape)
+def KAN_dataset(num_points):
+    all_data_train = []
+    all_label_train = []
+    all_data_test = []
+    all_label_test = []
+    data, label = load_data('train')
+    
+    # train
+    for i in range(len(data)):
+        pointcloud = data[i][:num_points]
+        labels = label[i]
+        pointcloud = random_point_dropout(pointcloud) # open for dgcnn not for our idea  for all
+        pointcloud = translate_pointcloud(pointcloud)
+        np.random.shuffle(pointcloud)
+        all_data_train.append(pointcloud)
+        all_label_train.append(labels)
+    
+    data, label = load_data('test')
+    
+    # test
+    for i in range(len(data)):
+        pointcloud = data[i][:num_points]
+        labels = label[i]
+        # test
+        all_data_test.append(pointcloud)
+        all_label_test.append(labels)
+
+
+    dataset = {}
+    dataset['train_input'] = torch.tensor(all_data_train)
+    dataset['test_input'] = torch.tensor(all_data_test)
+    dataset['train_label'] = torch.tensor(all_label_train)
+    dataset['test_label'] = torch.tensor(all_label_test)
+    return dataset
+

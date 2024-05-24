@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from data import ModelNet40
+from data import KAN_dataset, ModelNet40
 from model import Pct
 import numpy as np
 from torch.utils.data import DataLoader
@@ -27,15 +27,14 @@ def _init_():
     os.system('cp data.py checkpoints' + '/' + args.exp_name + '/' + 'data.py.backup')
 
 def train(args, io):
-    # load data
-    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points), num_workers=2,
+
+    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points), num_workers=8,
                             batch_size=args.batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points), num_workers=2,
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points), num_workers=8,
                             batch_size=args.test_batch_size, shuffle=True, drop_last=False)
 
     device = torch.device("cuda" if args.cuda else "cpu")
 
-    # load model
     model = Pct(args).to(device)
     print(str(model))
     model = nn.DataParallel(model)
@@ -56,7 +55,6 @@ def train(args, io):
         scheduler.step()
         train_loss = 0.0
         count = 0.0
-        model.train()
         train_pred = []
         train_true = []
         idx = 0
@@ -93,42 +91,63 @@ def train(args, io):
                                                                                 train_true, train_pred))
         io.cprint(outstr)
 
-        ####################
-        # Test
-        ####################
-        test_loss = 0.0
-        count = 0.0
-        model.eval()
-        test_pred = []
-        test_true = []
-        total_time = 0.0
-        for data, label in test_loader:
-            data, label = data.to(device), label.to(device).squeeze()
-            data = data.permute(0, 2, 1)
-            batch_size = data.size()[0]
-            start_time = time.time()
-            logits = model(data)
-            end_time = time.time()
-            total_time += (end_time - start_time)
-            loss = criterion(logits, label)
-            preds = logits.max(dim=1)[1]
-            count += batch_size
-            test_loss += loss.item() * batch_size
-            test_true.append(label.cpu().numpy())
-            test_pred.append(preds.detach().cpu().numpy())
-        print ('test total time is', total_time)
-        test_true = np.concatenate(test_true)
-        test_pred = np.concatenate(test_pred)
-        test_acc = metrics.accuracy_score(test_true, test_pred)
-        avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
-        outstr = 'Test %d, loss: %.6f, test acc: %.6f, test avg acc: %.6f' % (epoch,
-                                                                            test_loss*1.0/count,
-                                                                            test_acc,
-                                                                            avg_per_class_acc)
-        io.cprint(outstr)
-        if test_acc >= best_test_acc:
-            best_test_acc = test_acc
-            torch.save(model.state_dict(), 'checkpoints/%s/models/model.t7' % args.exp_name)
+    # # load data
+
+    # dataset = KAN_dataset(args.num_points)
+    # device = torch.device("cuda" if args.cuda else "cpu")
+    # criterion = cal_loss
+    # print("finish load data")
+    # # load model
+    # model = Pct(args).to(device)
+    # print(str(model))
+    # model = nn.DataParallel(model)
+
+    # if args.use_sgd:
+    #     print("Use SGD")
+    #     opt = optim.SGD(model.parameters(), lr=args.lr*100, momentum=args.momentum, weight_decay=5e-4)
+    # else:
+    #     print("Use Adam")
+    #     opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+
+    # scheduler = CosineAnnealingLR(opt, args.epochs, eta_min=args.lr)
+    
+    # criterion = cal_loss
+    # best_test_acc = 0
+
+    # count = len(dataset['train_input'])
+
+    # total_time = 0.0
+    # dataset['train_label'] = dataset['train_label'].to(device).squeeze() 
+    # dataset['train_input'] = dataset['train_input'].to(device).permute(0, 2, 1)
+
+
+    # for epoch in range(args.epochs):
+    #     train_loss = 0.0
+    #     opt.zero_grad()
+
+    #     start_time = time.time()
+    #     logits = model(dataset['train_input'])
+    #     loss = criterion(logits, dataset['train_label'])
+    #     loss.backward()
+    #     opt.step()
+    #     scheduler.step()
+    #     end_time = time.time()
+    #     total_time += (end_time - start_time)
+        
+    #     preds = logits.max(dim=1)[1]
+    #     train_loss += loss.item()
+
+    #     dataset['train_label'] = dataset['train_label'].cpu().numpy()
+    #     preds = preds.detach().cpu().numpy()    
+    #     print ('train total time is',total_time)
+    #     outstr = 'Train %d, loss: %.6f, train acc: %.6f, train avg acc: %.6f' % (epoch,
+    #                                                                             train_loss*1.0/count,
+    #                                                                             metrics.accuracy_score(
+    #                                                                             dataset['train_label'], preds),
+    #                                                                             metrics.balanced_accuracy_score(
+    #                                                                             dataset['train_label'], preds))
+    #     io.cprint(outstr)
+
 
 
 def test(args, io):

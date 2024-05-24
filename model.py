@@ -41,15 +41,17 @@ class Pct(nn.Module):
                                     nn.LeakyReLU(negative_slope=0.2))
 
         # replace KAN layer
-        self.kan1 = KAN([1024, 5, 512])
+        # self.kan1 = KAN([1024, 5, 512], device="cuda")
+        self.linear1 = nn.Linear(1024, 512, bias=False)
         self.bn6 = nn.BatchNorm1d(512)
         self.dp1 = nn.Dropout(p=args.dropout)
         # replace KAN layer
-        self.kan2 = KAN([512, 5, 256])
+        self.kan2 = KAN([512, 5, 256], device="cuda")
         self.bn7 = nn.BatchNorm1d(256)
         self.dp2 = nn.Dropout(p=args.dropout)
         # replace KAN layer
-        self.kan3 = KAN([256, 5, output_channels])
+        # self.kan3 = KAN([256, 5, output_channels], device="cuda")
+        self.linear3 = nn.Linear(256, output_channels)
 
     def forward(self, x):
         xyz = x.permute(0, 2, 1)
@@ -69,11 +71,11 @@ class Pct(nn.Module):
         x = torch.cat([x, feature_1], dim=1)
         x = self.conv_fuse(x)
         x = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-        x = F.leaky_relu(self.bn6(self.kan1(x)), negative_slope=0.2)
+        x = F.leaky_relu(self.bn6(self.linear1(x)), negative_slope=0.2)
         x = self.dp1(x)
         x = F.leaky_relu(self.bn7(self.kan2(x)), negative_slope=0.2)
         x = self.dp2(x)
-        x = self.kan3(x)
+        x = self.linear3(x)
 
         return x
 
