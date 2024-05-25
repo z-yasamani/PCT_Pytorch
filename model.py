@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from util import sample_and_group 
-from kan import KAN
+from pykan.kan import KAN
 
 class Local_op(nn.Module):
     def __init__(self, in_channels, out_channels):
